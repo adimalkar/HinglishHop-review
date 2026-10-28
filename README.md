@@ -1,11 +1,11 @@
-# HinglishHop review website
+# HinglishHop human review
 
-Reviewer address: https://adimalkar.github.io/HinglishHop-review/
+One reviewer URL: https://adimalkar.github.io/HinglishHop-review/
 
-Use a personal invitation from an author. Work independently, submit token labels before inspecting the English question, and record actual prior exposure. Drafts and decisions save to a private hosted database. Optional JSON exports are backups.
+Choose an alias, record comfort with Hindi and English, and consent to participation. No invitation, password or account is required. A private browser identifier is generated automatically to resume saved work; aliases are display labels and cannot retrieve someone else's answers.
 
-This public repository contains only the browser application and empty form templates. It contains no review questions, answer keys, reviewer invitations, identities or responses. Automatic assignment and storage use the authenticated API configured in `config.js`; GitHub Pages alone cannot supply server-side storage.
+The site includes calibration, question and evidence review, writing contributions and research collection progress. Each answer selection starts an immediate database write. Text changes save after a short typing pause. “Saved online” means the backend acknowledged the write. A local retry queue preserves pending changes during connection loss. “Complete question” validates a finished judgment; saved drafts are not automatically completed reviews.
 
-Each person completes ten calibration questions first. Authors inspect calibration before enabling five-question development batches. Assignment favours less-covered items and balances source datasets within the eligible pool. Two codes used by one person do not constitute independent reviews. More submissions do not by themselves establish dataset validity or publication readiness.
+Progress resumes in the same browser. An alias on another device starts a separate identity. Avoid repeating work under multiple identities. Completing calibration opens additional collection batches; author quality inspection, independent review and adjudication are still needed before research use. Optional training consent is recorded separately; no training or data release happens automatically.
 
-If you already started an offline packet, keep its original exports and tell the authors before repeating those items. Website records have a separate version and do not silently overwrite earlier work.
+This public repository contains only application code and styling. Questions and responses are fetched from the backend; raw reviewer records and exports remain private. The Research section exposes aggregate collection counts only.

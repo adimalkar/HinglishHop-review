@@ -1,0 +1,130 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<title>HinglishHop source evidence review</title>
+<style>
+body{font:16px/1.5 system-ui;margin:0;background:#f3f5f8;color:#18212c}main{max-width:1100px;margin:auto;padding:24px}.card{background:white;border:1px solid #cbd5e1;border-radius:9px;padding:18px;margin:16px 0}h1,h2,h3{line-height:1.25}.muted{color:#52647a}label{display:block;margin:10px 0}input,select,textarea,button{font:inherit}input[type=text],textarea{box-sizing:border-box;width:100%;padding:8px;border:1px solid #94a3b8;border-radius:4px}textarea{min-height:75px}select{max-width:100%;padding:6px}button{padding:8px 13px;cursor:pointer}button:disabled{cursor:default}pre,blockquote{white-space:pre-wrap;overflow-wrap:anywhere;margin:10px 0}pre{font:inherit}blockquote{border-left:3px solid #94a3b8;padding-left:12px}.tools{display:flex;gap:9px;align-items:center;flex-wrap:wrap}.claim{background:#eef3f8;padding:12px}.evidence{border:1px dashed #b9c5d4;padding:12px;margin:12px 0}.citation{border-top:1px solid #dbe3ec;padding:8px 0}.status{white-space:pre-wrap}details{margin:10px 0}summary{cursor:pointer}#workspace[hidden]{display:none}#problem{color:#9c2424}
+</style>
+<main>
+<h1>Source evidence review</h1>
+<p>Check whether the supplied source documents establish the question's required relations and answer. Source answers and annotations are claims to inspect. Model responses, scores and diagnostic notes are absent from this form.</p>
+<p class="muted">This is a separate English source-quality task. Finish any overlapping token-first calibration export before opening the English material, or record the actual prior exposure and order. There is no target score or required agreement. This file sends no data over the network.</p>
+<section class="card" id="identity">
+<label>Your stable private reviewer code<input id="reviewer" type="text" maxlength="200" autocomplete="off"></label>
+<label><input type="checkbox" id="human"> I am completing these judgments personally.</label>
+<label><input type="checkbox" id="consent"> I consent to research use under this reviewer code.</label>
+<label><input type="checkbox" id="independent"> I am making these decisions independently, without copying another reviewer or machine advice. Leave unchecked if that is not true.</label>
+<button id="begin">Open questions / resume</button>
+<p class="muted">Use one profile per person. Different profiles do not make one person independent reviewers. Only saved submissions are exported; local drafts are not completed reviews.</p>
+</section>
+<p id="problem" role="alert"></p>
+<div id="workspace" hidden>
+<div class="tools"><button id="previous">Previous</button><button id="next">Next</button><span id="position"></span><button id="pause">Pause</button><span id="timer"></span></div>
+<section class="card"><h2 id="question"></h2><p id="answer"></p><p id="inventory-note" class="muted"></p><details><summary>Source provenance</summary><pre id="provenance"></pre></details></section>
+<section class="card"><h2>Prior exposure and actual order</h2><div id="exposure"></div><label>Token and source review order<select id="review-order"></select></label><label>Actual review order, prior exposure or uncertainty<textarea id="review-order-notes"></textarea></label></section>
+<section class="card"><h2>Supplied source support documents</h2><p class="muted">This task concerns only the retained annotated support set. “Unsupported here” does not mean a fact is false or absent from a larger corpus. Copy exact excerpts, including punctuation, into evidence fields.</p><div id="documents"></div></section>
+<section class="card"><h2>Required relation inventory</h2><p>Restate the subject, relation and object for every source unit. Add any missing relations. A name and an answer occurring together do not establish the requested relation. Use unclear when you cannot decide; explain the uncertainty.</p><div id="relations"></div><button id="add-relation">Add a required relation</button></section>
+<section class="card"><h2>Overall question and answer</h2><div id="overall"></div><h3>Evidence for the complete answer</h3><div id="answer-evidence"></div><label>Explanation, alternative answers, temporal scope and remaining concerns<textarea id="overall-notes"></textarea></label></section>
+<section class="card"><button id="save">Save item</button><p id="status" class="status" role="status"></p></section>
+</div>
+<section class="card"><button id="export">Export all saved submissions</button><p id="saved"></p><p class="muted">Keep the original JSON export unchanged. Export partial progress too. Preparing or submitting this form does not certify source quality, reviewer independence, or a research gate.</p></section>
+</main>
+<script id="packet" type="application/json">__PACKET__</script>
+<script>
+'use strict';
+const packet=JSON.parse(document.getElementById('packet').textContent),byId=id=>document.getElementById(id);
+const storeKey='hinglishhop-source-evidence:'+packet.packet_id;
+let state={reviewer:'',events:[],drafts:{},timers:{}},index=0,opened=false,running=false,last=0,busy=false;
+try{const raw=localStorage.getItem(storeKey);if(raw)state=JSON.parse(raw);}catch(error){byId('problem').textContent='Stored work could not be read. Keep any earlier exports.';}
+byId('reviewer').value=state.reviewer||'';
+function current(){return packet.items[index];}
+function code(){return byId('reviewer').value.trim();}
+function key(){return current().item_id+':'+code();}
+function node(tag,text,cls){const e=document.createElement(tag);if(text!==undefined)e.textContent=text;if(cls)e.className=cls;return e;}
+function choose(options,value){const select=node('select');select.append(new Option('Choose…',''));options.forEach(([v,t])=>select.append(new Option(t,v)));select.value=value||'';return select;}
+function label(caption,control){const e=node('label',caption);e.append(control);return e;}
+function latest(){return state.events.filter(e=>e.item_id===current().item_id&&e.reviewer_id===code()).slice(-1)[0];}
+function clock(){if(!state.timers[key()])state.timers[key()]={start_utc:new Date().toISOString(),active:0};return state.timers[key()];}
+function tick(){if(running){clock().active+=(performance.now()-last)/1000;last=performance.now();}}
+function persist(){state.reviewer=code();try{localStorage.setItem(storeKey,JSON.stringify(state));}catch(error){byId('problem').textContent='Local saving failed. Export saved submissions before closing this page.';}byId('saved').textContent=state.events.length+' saved submission events (including revisions).';}
+function pause(){tick();running=false;byId('pause').textContent='Resume';persist();}
+function resume(){last=performance.now();running=true;byId('pause').textContent='Pause';}
+function canonical(value){if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==='object'){const result={};Object.keys(value).sort().forEach(k=>result[k]=canonical(value[k]));return result;}return value;}
+async function hash(value){const bytes=new TextEncoder().encode(JSON.stringify(canonical(value))),raw=await crypto.subtle.digest('SHA-256',bytes);return Array.from(new Uint8Array(raw)).map(x=>x.toString(16).padStart(2,'0')).join('');}
+function evidenceWidget(initial=[],pending={}){
+ const box=node('div',undefined,'evidence'),list=node('div'),documentChoice=choose(current().passages.map(p=>[p.passage_id,p.title+' ['+p.passage_id.slice(0,10)+']']),pending.passage_id);
+ const fieldChoice=choose([['text','Document body'],['title','Document title']],pending.field||'text'),quote=node('textarea'),occurrence=node('input');quote.value=pending.quote||'';occurrence.type='number';occurrence.min='1';occurrence.value=pending.occurrence||'1';
+ let citations=JSON.parse(JSON.stringify(initial));
+ function show(){list.replaceChildren();citations.forEach((span,i)=>{const row=node('div',undefined,'citation');row.append(node('small',span.field+' · characters '+span.start+'–'+span.end),node('blockquote',span.quote));const remove=node('button','Remove excerpt');remove.type='button';remove.onclick=()=>{citations.splice(i,1);show();saveDraft();};row.append(remove);list.append(row);});}
+ const add=node('button','Add exact excerpt');add.type='button';add.onclick=()=>{try{
+  const passage=current().passages.find(p=>p.passage_id===documentChoice.value);if(!passage||!fieldChoice.value||!quote.value.trim())throw Error('Choose a document and field, then paste an exact excerpt.');
+  const body=passage[fieldChoice.value],matches=[];let position=0,found;while((found=body.indexOf(quote.value,position))!==-1){matches.push(found);position=found+1;}
+  const count=Number(occurrence.value);if(!Number.isInteger(count)||count<1||count>matches.length)throw Error('Exact excerpt not found at that occurrence. It occurs '+matches.length+' time(s).');
+  const start=Array.from(body.slice(0,matches[count-1])).length,end=start+Array.from(quote.value).length;
+  if(citations.some(s=>s.passage_id===passage.passage_id&&s.field===fieldChoice.value&&s.start===start&&s.end===end))throw Error('That excerpt is already added.');
+  citations.push({passage_id:passage.passage_id,field:fieldChoice.value,start,end,quote:quote.value});quote.value='';show();saveDraft();byId('problem').textContent='';
+ }catch(error){byId('problem').textContent=error.message;}};
+ box.append(list,label('Document',documentChoice),label('Field',fieldChoice),label('Exact excerpt',quote),label('Occurrence number if the excerpt repeats',occurrence),add);show();
+ box.read=()=>JSON.parse(JSON.stringify(citations));box.pending=()=>({passage_id:documentChoice.value,field:fieldChoice.value,quote:quote.value,occurrence:occurrence.value});
+ box.unadded=()=>Boolean(quote.value.trim());return box;
+}
+const decisionNames={supported_explicit:'Explicitly supported',supported_inference:'Supported through a stated inference',contradicted:'Contradicted by supplied evidence',unsupported:'Relation not established in this support set',unclear:'Unclear'};
+function relationCard(value){
+ const box=node('section',undefined,'card relation');box.dataset.relationId=value.relation_id;box.dataset.sourceUnitId=value.source_unit_id||'';
+ const source=current().source_units.find(u=>u.unit_id===value.source_unit_id);
+ if(source){box.append(node('h3','Unverified source unit'));const claim=node('pre',JSON.stringify(source,null,2),'claim');box.append(claim);}else{const top=node('div',undefined,'tools'),remove=node('button','Remove added relation');remove.type='button';remove.onclick=()=>{box.remove();saveDraft();};top.append(node('h3','Reviewer-defined required relation'),remove);box.append(top);}
+ ['subject','relation','object'].forEach(field=>{const input=node('input');input.type='text';input.dataset.field=field;input.value=value[field]||'';box.append(label(field[0].toUpperCase()+field.slice(1),input));});
+ const decision=choose(packet.rubric.relation_decisions.map(k=>[k,decisionNames[k]]),value.decision);decision.dataset.field='decision';box.append(label('Evidence judgment',decision));
+ const reason=node('textarea');reason.dataset.field='explanation';reason.value=value.explanation||'';box.append(label('Explain the relation or the unresolved issue',reason));
+ const evidence=evidenceWidget(value.evidence||[],value.pending_citation||{});box.append(evidence);
+ box.read=()=>{const result={relation_id:value.relation_id,source_unit_id:value.source_unit_id,evidence:evidence.read()};box.querySelectorAll('[data-field]').forEach(e=>result[e.dataset.field]=e.value||null);return result;};
+ box.draft=()=>({...box.read(),pending_citation:evidence.pending()});box.unadded=evidence.unadded;return box;
+}
+function newRelation(unit=null,id=null){return {relation_id:id||(unit?unit.unit_id:'reviewer-'+crypto.randomUUID()),source_unit_id:unit?unit.unit_id:null,subject:null,relation:null,object:null,decision:null,explanation:null,evidence:[]};}
+function saveDraft(){if(!opened||busy)return;const value={relations:Array.from(byId('relations').children).map(e=>e.draft()),overall:{},exposure:{},review_order:byId('review-order').value,review_order_notes:byId('review-order-notes').value};byId('overall').querySelectorAll('select').forEach(e=>value.overall[e.dataset.field]=e.value||null);value.overall.notes=byId('overall-notes').value;value.overall.answer_evidence=byId('answer-evidence').firstChild.read();value.overall.pending_citation=byId('answer-evidence').firstChild.pending();byId('exposure').querySelectorAll('select').forEach(e=>value.exposure[e.dataset.field]=e.value);state.drafts[key()]=value;persist();}
+function show(){
+ pause();byId('workspace').hidden=false;byId('reviewer').disabled=true;byId('position').textContent=(index+1)+' / '+packet.items.length+' · '+current().source;
+ byId('question').textContent=current().question;byId('answer').textContent='Unverified source answer: '+current().source_answer;
+ byId('provenance').textContent=JSON.stringify(current().provenance,null,2);
+ byId('inventory-note').textContent=current().source_units.length?'Review every source unit and add any missing required relations. Source annotations are not verified by their presence.':'This source has supporting facts but no supplied atomic relation inventory. Identify the relations yourself; do not assume an invented decomposition is official.';
+ byId('documents').replaceChildren();current().passages.forEach(p=>{const d=node('details');d.append(node('summary',p.title+' ['+p.passage_id.slice(0,10)+']'),node('pre',p.text));byId('documents').append(d);});
+ const old=latest(),draft=state.drafts[key()]||old||{},relations=draft.relations||(current().source_units.length?current().source_units.map(u=>newRelation(u)):[newRelation()]);
+ byId('relations').replaceChildren(...relations.map(relationCard));
+ byId('exposure').replaceChildren();const exposureLabels={source_seen_before:'Before this source-review task, had you seen this English source case?',model_outputs_seen_before:'Had you seen model responses or scores for this case?',agent_notes_seen_before:'Had you seen agent diagnostic notes for this case?'};
+ packet.rubric.exposure_fields.forEach(k=>{const select=choose([['yes','Yes'],['no','No'],['unclear','Unclear']],draft.exposure&&draft.exposure[k]);select.dataset.field=k;byId('exposure').append(label(exposureLabels[k],select));});
+ byId('review-order').replaceChildren(new Option('Choose…',''),...packet.rubric.order_decisions.map(k=>new Option(k.replaceAll('_',' '),k)));byId('review-order').value=draft.review_order||'';byId('review-order-notes').value=draft.review_order_notes||'';
+ byId('overall').replaceChildren();const overallLabels={answerability:'Is the source answer established by the supplied documents?',answer_unique:'Does the question uniquely specify the answer?',specificity_clear:'Is the required answer type and granularity clear?',multi_hop_required:'Are multiple evidence steps required rather than a shortcut?',relation_inventory_complete:'Have you identified every required relation?',temporal_scope_clear:'Is temporal scope sufficiently clear? Select yes if time is irrelevant.'};
+ packet.rubric.overall_fields.forEach(k=>{const select=choose([['yes','Yes'],['no','No'],['unclear','Unclear']],draft.overall&&draft.overall[k]);select.dataset.field=k;byId('overall').append(label(overallLabels[k],select));});
+ byId('overall-notes').value=draft.overall?draft.overall.notes||'':'';byId('answer-evidence').replaceChildren(evidenceWidget(draft.overall?draft.overall.answer_evidence||[]:[],draft.overall?draft.overall.pending_citation||{}:{}));
+ byId('status').textContent=old?'Saved revision '+old.revision+' exists. Saving appends a new revision; it does not overwrite the first.':'No submission saved for this item. Drafts are not completed reviews.';
+ clock();resume();updateNavigation();persist();
+}
+function updateNavigation(){byId('previous').disabled=busy||index===0;byId('next').disabled=busy||index===packet.items.length-1;byId('save').disabled=busy;byId('add-relation').disabled=busy;byId('begin').disabled=busy;byId('export').disabled=busy;}
+byId('begin').onclick=()=>{if(busy)return;if(!code()||!byId('human').checked||!byId('consent').checked){byId('problem').textContent='Enter your reviewer code and personally record completion and consent.';return;}if(opened)saveDraft();opened=true;byId('problem').textContent='';show();};
+byId('add-relation').onclick=()=>{byId('relations').append(relationCard(newRelation()));saveDraft();};
+byId('save').onclick=async()=>{
+ if(busy)return;tick();saveDraft();
+ try{
+  if(!byId('human').checked||!byId('consent').checked)throw Error('Personal completion and consent are required for a human submission.');
+  const draft=state.drafts[key()],relations=Array.from(byId('relations').children).map(e=>e.read()),overall={...draft.overall};delete overall.pending_citation;
+  if(!relations.length||relations.some(r=>!r.subject||!r.relation||!r.object||!r.decision||!r.explanation))throw Error('Complete every relation or explicitly choose unclear and explain it.');
+  if(Array.from(byId('relations').children).some(e=>e.unadded())||byId('answer-evidence').firstChild.unadded())throw Error('Add each pending excerpt or clear its draft field before saving.');
+  if(relations.some(r=>['supported_explicit','supported_inference','contradicted'].includes(r.decision)&&!r.evidence.length))throw Error('Support and contradiction decisions need exact evidence excerpts.');
+  if(packet.rubric.overall_fields.some(k=>!overall[k])||!overall.notes)throw Error('Choose every overall judgment and explain the result.');
+  if(overall.answerability==='yes'&&!overall.answer_evidence.length)throw Error('Answerability yes needs evidence for the answer.');
+  if(packet.rubric.exposure_fields.some(k=>!draft.exposure[k])||!draft.review_order||!draft.review_order_notes.trim())throw Error('Record actual prior exposure and review order, including uncertainty.');
+  const old=latest(),c=clock(),end=new Date(),wall=Math.max(0,(end-Date.parse(c.start_utc))/1000),active=Math.min(wall,c.active);
+  const record={packet_id:packet.packet_id,item_id:current().item_id,kind:'source_evidence',reviewer_id:code(),actor_type:'human',model_id:null,agent_id:null,self_attested_human:true,consent_to_research:true,independent_completion:byId('independent').checked,exposure:draft.exposure,review_order:draft.review_order,review_order_notes:draft.review_order_notes,revision:old?old.revision+1:0,parent_event_id:old?old.event_id:null,relations,overall,timing:{start_utc:c.start_utc,end_utc:end.toISOString(),active_seconds:Math.round(active*1000)/1000,paused_seconds:Math.round((wall-active)*1000)/1000}};
+  busy=true;updateNavigation();record.event_id=await hash(record);state.events.push(record);persist();byId('status').textContent='Saved revision '+record.revision+'. Export your saved submissions.';byId('problem').textContent='';
+ }catch(error){byId('problem').textContent='Not saved: '+error.message;}finally{busy=false;updateNavigation();}
+};
+function move(delta){if(busy)return;saveDraft();pause();index+=delta;show();}
+byId('previous').onclick=()=>{if(index>0)move(-1);};byId('next').onclick=()=>{if(index+1<packet.items.length)move(1);};byId('pause').onclick=()=>running?pause():resume();
+byId('export').onclick=()=>{if(busy)return;if(opened){tick();saveDraft();}persist();const value={schema_version:'1.0',packet_id:packet.packet_id,events:state.events},blob=new Blob([JSON.stringify(value,null,2)],{type:'application/json'}),url=URL.createObjectURL(blob),link=node('a');link.href=url;link.download='hinglishhop-source-review-'+packet.packet_id.slice(0,12)+'.json';link.click();setTimeout(()=>URL.revokeObjectURL(url),1000);};
+byId('workspace').addEventListener('input',saveDraft);byId('workspace').addEventListener('change',saveDraft);
+window.addEventListener('blur',()=>{if(opened){saveDraft();pause();}});document.addEventListener('visibilitychange',()=>{if(document.hidden&&opened){saveDraft();pause();}});window.addEventListener('beforeunload',()=>{if(opened){saveDraft();pause();}});
+setInterval(()=>{if(opened){tick();byId('timer').textContent=Math.round(clock().active)+' active seconds';}},1000);persist();
+</script>
+</html>

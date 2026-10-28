@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>HinglishHop annotation</title>
+<style>
+body{font:16px/1.55 system-ui,sans-serif;color:#18212c;background:#f1f4f8;margin:0}
+main{max-width:940px;margin:auto;padding:24px}h1{font-size:25px;margin-bottom:4px}h2{font-size:16px}
+.card{background:white;border:1px solid #ccd5df;border-radius:10px;padding:20px;margin:15px 0}
+.notice{border-left:5px solid #ad7008;background:#fff8e6;padding:12px}
+button,input,textarea,select{font:inherit}button{cursor:pointer;padding:9px 15px;border:1px solid #47668a;border-radius:6px;background:#fff;color:#173e6a}
+button.primary{background:#174e82;color:white}button:disabled{opacity:.5;cursor:default}
+input[type=text],textarea{box-sizing:border-box;width:100%;padding:9px;border:1px solid #8e9caa;border-radius:5px}
+textarea{min-height:84px}fieldset{margin:14px 0;border:1px solid #d0d9e3;border-radius:6px}
+label.option{display:inline-block;margin:7px 18px 7px 0}.muted{color:#516273}.text{white-space:pre-wrap}
+.toolbar{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.progress{margin-left:auto}.flag{font-size:14px;color:#835100}
+.hidden{display:none}#status{white-space:pre-wrap;color:#164c37}details{padding:10px 0}legend{font-weight:600}
+</style>
+<main>
+<h1>HinglishHop annotation</h1>
+<div class="notice" id="notice"></div>
+<section class="card">
+<label for="reviewer">Your private reviewer code</label><input id="reviewer" type="text" autocomplete="off" placeholder="Choose a stable pseudonym">
+<label class="option"><input type="checkbox" id="human"> I am completing this work personally.</label>
+<label class="option"><input type="checkbox" id="consent"> I consent to research use of these responses under my reviewer code.</label>
+<p class="muted">This file sends nothing over the network. Export your work to keep a portable copy. Pause for breaks; the timer pauses when this window loses focus.</p>
+</section>
+<div class="toolbar"><button id="previous">Previous</button><button id="next">Next</button><span id="position" class="progress"></span></div>
+<section class="card"><h2 id="sourceLabel">English source</h2><div class="text" id="source"></div>
+<h2 id="draftLabel">Hinglish draft</h2><div class="text" id="draft"></div><div id="flags" class="flag"></div><div id="evidence"></div></section>
+<form class="card" id="form">
+<div id="reviewFields">
+<fieldset><legend>Meaning preserved</legend>
+<label class="option"><input type="radio" name="meaning" value="yes"> Yes</label>
+<label class="option"><input type="radio" name="meaning" value="no"> No</label>
+<label class="option"><input type="radio" name="meaning" value="uncertain"> Uncertain</label></fieldset>
+<fieldset><legend>Entities, dates and numbers intact</legend>
+<label class="option"><input type="radio" name="entities" value="yes"> Yes</label>
+<label class="option"><input type="radio" name="entities" value="no"> No</label>
+<label class="option"><input type="radio" name="entities" value="uncertain"> Uncertain</label></fieldset>
+<fieldset><legend>Naturalness</legend>
+<label class="option"><input type="radio" name="naturalness" value="1"> 1 — incomprehensible</label>
+<label class="option"><input type="radio" name="naturalness" value="2"> 2 — awkward</label>
+<label class="option"><input type="radio" name="naturalness" value="3"> 3 — acceptable</label>
+<label class="option"><input type="radio" name="naturalness" value="4"> 4 — natural</label>
+<label class="option"><input type="radio" name="naturalness" value="5"> 5 — very natural</label></fieldset>
+<label class="option"><input id="adjudication" type="checkbox"> Needs repair, source curation or adjudication</label>
+</div>
+<div id="authorFields" class="hidden">
+<label for="writtenQuestion">Your romanized Hinglish question</label><textarea id="writtenQuestion"></textarea>
+<label for="writtenAnswer">Intended answer</label><input id="writtenAnswer" type="text">
+<label for="evidenceIds">Evidence letters needed (for example A,B)</label><input id="evidenceIds" type="text">
+<p class="muted">Use facts across at least two passages. Do not look up the original source question. This practice work remains excluded from the benchmark.</p>
+</div>
+<label for="notes">Notes or exact repair suggestion</label><textarea id="notes"></textarea>
+<div class="toolbar"><button type="button" id="pause">Pause</button><span id="timer"></span><button class="primary" type="submit">Save decision</button></div>
+<p id="status" role="status"></p>
+</form>
+<section class="card toolbar"><button id="export">Export all saved work</button><span id="saved" class="muted"></span></section>
+</main>
+<script type="application/json" id="packet">__PACKET_JSON__</script>
+<script>
+"use strict";
+const packet=JSON.parse(document.getElementById("packet").textContent);
+const byId=id=>document.getElementById(id);
+const key="hinglishhop:"+packet.packet_id;
+let state={reviewer:"",events:[],timers:{}},index=0,running=false,last=0;
+try{const old=localStorage.getItem(key);if(old)state=JSON.parse(old);}catch(e){}
+byId("reviewer").value=state.reviewer||"";
+function current(){return packet.items[index];}
+function timerKey(){return current().item_id;}
+function timer(){const k=timerKey();if(!state.timers[k])state.timers[k]={start_utc:new Date().toISOString(),active:0};return state.timers[k];}
+function tick(){if(running){timer().active+=(performance.now()-last)/1000;last=performance.now();}}
+function persist(){state.reviewer=byId("reviewer").value.trim();try{localStorage.setItem(key,JSON.stringify(state));}catch(e){byId("status").textContent="Local saving is unavailable; export your work before closing.";}byId("saved").textContent=state.events.length+" saved decision events";}
+function pause(){tick();running=false;byId("pause").textContent="Resume";persist();}
+function resume(){last=performance.now();running=true;byId("pause").textContent="Pause";}
+function radio(name){const input=document.querySelector('input[name="'+name+'"]:checked');return input?input.value:null;}
+function fill(name,value){document.querySelectorAll('input[name="'+name+'"]').forEach(e=>{e.checked=e.value===String(value);});}
+function latest(){const reviewer=byId("reviewer").value.trim();return state.events.filter(e=>e.item_id===current().item_id&&e.reviewer_id===reviewer).slice(-1)[0];}
+function show(){
+ pause();const item=current(),author=packet.task_type==="authorship";
+ byId("position").textContent=(index+1)+" / "+packet.items.length;
+ byId("notice").textContent=author?"Evidence-first authorship practice. Original questions and expected answers are absent from this packet.":"Unverified LLM drafts. Check the source and draft independently; surface flags do not establish meaning or naturalness.";
+ byId("sourceLabel").classList.toggle("hidden",author);byId("source").classList.toggle("hidden",author);
+ byId("draftLabel").classList.toggle("hidden",author);byId("draft").classList.toggle("hidden",author);
+ byId("source").textContent=item.source_english||"";byId("draft").textContent=item.question||"";
+ byId("flags").textContent=(item.flags||[]).length?"Surface checks: "+item.flags.join(", "):"";
+ byId("evidence").replaceChildren();
+ (item.passages||[]).forEach(p=>{const d=document.createElement("details"),s=document.createElement("summary"),t=document.createElement("div");s.textContent=p.evidence_id+": "+p.title;t.className="text";t.textContent=p.text;d.append(s,t);d.open=author;byId("evidence").append(d);});
+ byId("reviewFields").classList.toggle("hidden",author);byId("authorFields").classList.toggle("hidden",!author);
+ byId("form").reset();const old=latest();
+ if(old){fill("meaning",old.meaning_preserved);fill("entities",old.entities_intact);fill("naturalness",old.naturalness);byId("adjudication").checked=!!old.needs_adjudication;byId("notes").value=old.notes||"";byId("writtenQuestion").value=old.question||"";byId("writtenAnswer").value=old.answer||"";byId("evidenceIds").value=(old.evidence_ids||[]).join(",");}
+ byId("status").textContent=old?"A saved decision exists. Saving again appends a visible revision.":"No decision saved for this item.";
+ byId("previous").disabled=index===0;byId("next").disabled=index===packet.items.length-1;timer();resume();persist();
+}
+function canonical(value){if(Array.isArray(value))return value.map(canonical);if(value&&typeof value==="object"){const out={};Object.keys(value).sort().forEach(k=>out[k]=canonical(value[k]));return out;}return value;}
+async function hash(value){const bytes=new TextEncoder().encode(JSON.stringify(canonical(value)));const result=await crypto.subtle.digest("SHA-256",bytes);return Array.from(new Uint8Array(result)).map(x=>x.toString(16).padStart(2,"0")).join("");}
+byId("form").addEventListener("submit",async event=>{
+ event.preventDefault();tick();
+ const reviewer=byId("reviewer").value.trim(),item=current(),old=latest();
+ if(!reviewer||!byId("human").checked||!byId("consent").checked){byId("status").textContent="Enter a reviewer code and record personal completion and consent.";return;}
+ const clock=timer(),end=new Date(),wall=Math.max(0,(end-Date.parse(clock.start_utc))/1000),active=Math.min(wall,clock.active);
+ const record={packet_id:packet.packet_id,item_id:item.item_id,kind:packet.task_type,reviewer_id:reviewer,actor_type:"human",self_attested_human:true,consent_to_research:true,
+ review_revision:old?old.review_revision+1:0,parent_review_id:old?old.review_id:null,notes:byId("notes").value,
+ timing:{start_utc:clock.start_utc,end_utc:end.toISOString(),active_seconds:Math.round(active*1000)/1000,paused_seconds:Math.round((wall-active)*1000)/1000}};
+ if(packet.task_type==="review"){
+  record.variant_id=item.variant_id;record.meaning_preserved=radio("meaning");record.entities_intact=radio("entities");record.naturalness=Number(radio("naturalness"));record.needs_adjudication=byId("adjudication").checked;
+  if(!record.meaning_preserved||!record.entities_intact||record.naturalness<1){byId("status").textContent="Complete the three independent ratings before saving.";return;}
+ }else{
+  record.question=byId("writtenQuestion").value.trim();record.answer=byId("writtenAnswer").value.trim();record.evidence_ids=byId("evidenceIds").value.split(",").map(x=>x.trim()).filter(Boolean);
+  const available=new Set((item.passages||[]).map(p=>p.evidence_id));
+  if(!record.question||!record.answer||new Set(record.evidence_ids).size<2||record.evidence_ids.some(x=>!available.has(x))){byId("status").textContent="Write a question, answer and at least two available evidence letters.";return;}
+ }
+ record.review_id=await hash(record);state.events.push(record);persist();byId("status").textContent="Saved revision "+record.review_revision+". Export your work when ready.";
+});
+byId("pause").addEventListener("click",()=>running?pause():resume());
+byId("previous").addEventListener("click",()=>{if(index>0){pause();index--;show();}});
+byId("next").addEventListener("click",()=>{if(index+1<packet.items.length){pause();index++;show();}});
+byId("reviewer").addEventListener("change",()=>{persist();show();});
+byId("export").addEventListener("click",()=>{tick();persist();const body=JSON.stringify({schema_version:"1.0",packet_id:packet.packet_id,events:state.events},null,2);const url=URL.createObjectURL(new Blob([body],{type:"application/json"}));const a=document.createElement("a");a.href=url;a.download="hinglishhop-"+packet.packet_id.slice(0,12)+"-reviews.json";a.click();URL.revokeObjectURL(url);});
+window.addEventListener("blur",pause);window.addEventListener("beforeunload",()=>{tick();persist();});
+setInterval(()=>{const seconds=timer().active+(running?(performance.now()-last)/1000:0);byId("timer").textContent=Math.floor(seconds/60)+"m "+Math.floor(seconds%60)+"s active"+(running?"":" (paused)");},500);
+show();
+</script></html>
